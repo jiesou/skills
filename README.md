@@ -38,4 +38,4 @@
 
 ## lcsc-coupon-optimizer
 
-优化立创商城 BOM 采购、品牌券凑单和运费门槛；安装：`npx skills add jiesou/skills --skill lcsc-coupon-optimizer`。
+优化立创商城 BOM 采购、品牌券凑单和运费门槛。
