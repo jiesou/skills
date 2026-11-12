@@ -35,3 +35,7 @@
 经常莫名其妙想研究一个话题，但现有的 Deep Research 不能满足我的需求。
 
 希望它找遍互联网的每一个角落，也许就能找到一点线索。
+
+## lcsc-coupon-optimizer
+
+优化立创商城 BOM 采购、品牌券凑单和运费门槛；安装：`npx skills add jiesou/skills --skill lcsc-coupon-optimizer`。

@@ -1,0 +1,74 @@
+---
+name: lcsc-coupon-optimizer
+description: Optimize LCSC (立创商城) BOM purchases around brand coupons and shipping thresholds, including compatibility checks, past-purchase exclusions, quantity planning, and cart review. Use when preparing or reviewing an LCSC order; never place or pay for an order without explicit confirmation.
+disable-model-invocation: true
+---
+
+# LCSC 立创商城满减凑单优化
+
+## 采购约束
+
+1. 从项目约定路径读取 BOM / 采购清单，区分硬需求、已有库存、另购和纯凑单。先查历史购买记录，查询方法见[交互指南](references/lcsc-interaction-guide.md)。买过的同型号或已核实同规格物料默认不再买，除非用户明确补货或库存耗尽；没查到记录不代表没有库存，不能用近名但规格不同的记录排除需求。
+2. 默认购物车及其他购物车只读，始终新建目标车。
+3. 默认不买：多数有品牌的芯片（尤其沁恒、ST、TI等，优先用库存或淘宝）；四脚轻触按钮及经典常备料；常见阻容（如0603的100nF、1uF、10µF、1kΩ、10kΩ、100kΩ）、常见晶体管、普通LED、常见卧贴Type-C、1117、普通2.54mm排针、小螺丝等。
+4. 不锁定BOM品牌；电气、脚位、封装和安装尺寸满足要求后，可优先考虑有券的品牌并集中同类采购。BOM标称值与料号矛盾、NC项先辨清，不照错料号购买。
+
+## 优化目标
+
+先满足规格、采购排除项和优惠券资格，再比较含邮费的实际支出；在此基础上提高硬需求占比，优先实用凑单并克制备货数量。券门槛、适用限制、拆单与运费规则统一见[优惠券参考](references/coupons.md)。
+
+价格效率比 = 硬需求的折后用券前金额 / 全部商品折后用券前金额。操作前后用同一口径计算，披露增加备货的数量；不为提高比率换贵料或无限加量。
+
+## 凑单流程
+
+### 1. 建立硬需求购物车
+
+硬需求尚未加入目标购物车的，先加入。
+
+### 2. 逐品牌优化
+
+用[交互指南](references/lcsc-interaction-guide.md)中的券中心及账户未用券接口检查当前券，再按[优惠券参考](references/coupons.md)判断品牌、商品资格和目标金额。候选品牌列表仅供查找线索，不视为永久白名单。
+
+先尝试调整该品牌内已有硬需求的数量。多数商品受最少起购量和购买倍数限制；将最小不可分割金额（最少购买数量 × 单价）作为一个候选金额单位。
+
+用 `scripts/optimize_quantities.py` 搜索数量组合：
+
+```bash
+python3 scripts/optimize_quantities.py '<json>' <threshold> [max_above]
+```
+
+JSON 格式：
+
+```json
+[{"name":"品名","unit_price":0.35,"min_qty":5,"qty_multiple":5,"current_qty":0,"min_extra":0}]
+```
+
+- `unit_price`：单品单价
+- `min_qty`：最少起购数量，默认1
+- `qty_multiple`：购买数量倍数，默认1
+- `current_qty`：当前车中数量，默认0
+- `min_extra`：允许在原数量上最少增加的数量，默认0
+
+脚本按候选总价排序，不保证全局最优，也未计算价格效率比。人工比较硬需求占比、用途和数量上限，并按交互指南回读购物车实际行金额核验。
+
+仅靠合理调整硬需求数量无法满足目标时，再在该品牌找凑单品：按实际 MOQ × 计费单价比较最低购买金额，优先缺少的硬需求及合理备损、同规格可用备料，再考虑确实合用的3.3V/5V低功耗LDO、MOS、TVS、晶体或连接器；不把运放和三态缓冲器作为默认凑单。页面若提供 `#searchListButton` 可辅助排序；单价升序不等于最低购买金额升序。
+
+没有合适品牌券时，优先换品牌，再考虑兼容替换。只在电气能力、脚位、封装和安装尺寸满足设计时替换；不能仅凭近似型号或同叫SOP-4判定兼容，也不能默认用更小封装换便宜。查关键规格及厂家数据手册；未能验证的差异单列为散件，不计作已验证硬需求。
+
+### 3. 拆单及结算
+
+按[优惠券参考](references/coupons.md)规划订单分组、免邮和绑定发货。API 查价/改数量等操作、修改后回读和 UI 核验步骤见[交互指南](references/lcsc-interaction-guide.md)。
+
+## 输出格式
+
+1. **硬需求清单表格**：品名、规格、厂家、数量、单价、小计
+2. **各厂家凑单方案表格**（每个厂家一张）：产品、数量、单价、小计、厂家总价、优惠券使用情况
+3. **兼容替换对比表格**（如有）：原产品 → 替换产品、替换理由、需用户确认
+4. **全场凑包邮明细**：补充产品列表与金额
+5. **总览**：原价总计、优惠券减免、实付及运费条件、价格效率比前后对照；简列因库存/已购/另购排除的物料。区分已入车、已预览和未实际绑定。
+
+## Resources
+
+- `scripts/optimize_quantities.py`：枚举数量组合，辅助搜索达到目标金额的方案。
+- [优惠券参考](references/coupons.md)：优惠券门槛、常用品牌线索、资格、拆单、运费与绑定规则；全量优惠品牌历史快照及生成脚本见其链接。
+- [交互指南](references/lcsc-interaction-guide.md)：商城搜索、购物车、商品数据、结算及历史购买查询的 API/UI 操作方法。网站交互方式变化时更新此文档。

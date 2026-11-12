@@ -1,0 +1,27 @@
+name: Skills CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-lcsc-skill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.20.0
+      - name: Validate skills CLI discovery
+        run: npx --yes skills@1.8.1 add . --skill lcsc-coupon-optimizer --list
+      - name: Smoke test quantity optimizer
+        shell: bash
+        run: |
+          output="$(python3 skills/lcsc-coupon-optimizer/scripts/optimize_quantities.py '[{"name":"smoke","unit_price":4}]' 8)"
+          grep -Fq 'Total: ¥8.00' <<< "$output"
